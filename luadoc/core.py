@@ -35,7 +35,7 @@ class FilesProcessor:
     def _process_one(self, file_path):
         """Process one file.
         """
-        with open(file_path) as file:
+        with open(file_path, encoding='utf8') as file:
             file_content = file.read()
 
         doc_parser = DocParser(self._doc_options)

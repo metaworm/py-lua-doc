@@ -119,8 +119,10 @@ def parse_type(type_str: str) -> model.LuaType:
         return model.LuaTypeNil()
     elif type_str in ["bool", "boolean"]:
         return model.LuaTypeBoolean()
-    elif type_str in ["number", "int", "float"]:
+    elif type_str in ["number", "float"]:
         return model.LuaTypeNumber()
+    elif type_str in ["int", "integer"]:
+        return model.LuaTypeInteger()
     elif type_str == "string":
         return model.LuaTypeString()
     elif type_str in ["function", "func", "fun"]:

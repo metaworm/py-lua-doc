@@ -65,6 +65,9 @@ class LuaTypeNumber(LuaType):
     def __init__(self):
         LuaType.__init__(self, "number")
 
+class LuaTypeInteger(LuaType):
+    def __init__(self):
+        LuaType.__init__(self, "integer")
 
 class LuaTypeString(LuaType):
     def __init__(self):
@@ -171,7 +174,7 @@ class LuaSourceNode(LuaNode):
 
 
 class LuaFunction(LuaSourceNode):
-    def __init__(self, name: str, short_desc: str = '', desc: str = '', params=None, returns=None):
+    def __init__(self, name: str, short_desc: str = '', desc: str = '', params=None, returns=None, usage=[]):
         LuaSourceNode.__init__(self)
 
         if returns is None:
@@ -184,7 +187,7 @@ class LuaFunction(LuaSourceNode):
         self.desc = desc
         self.params = params
         self.returns = returns
-        self.usage = ''
+        self.usage = '\n'.join(usage)
         self.is_virtual = False
         self.is_abstract = False
         self.is_deprecated = False

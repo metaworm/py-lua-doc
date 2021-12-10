@@ -170,12 +170,12 @@ class LuaDocParser:
             # methods
             if type(ast_node) == Method:
                 short_desc, long_desc = self._get_short_desc_and_desc()
-                doc_nodes.append(LuaFunction('', short_desc, long_desc, [], self._pending_return).init(ast_node))
+                doc_nodes.append(LuaFunction('', short_desc, long_desc, [], self._pending_return, self._usage_str).init(ast_node))
 
             # Detect static method: a Function with an Index as name
             if type(ast_node) == Function:
                 short_desc, long_desc = self._get_short_desc_and_desc()
-                doc_nodes.append(LuaFunction('', short_desc, long_desc, [], self._pending_return).init(ast_node))
+                doc_nodes.append(LuaFunction('', short_desc, long_desc, [], self._pending_return, self._usage_str).init(ast_node))
 
         # handle function pending elements
         if doc_nodes and type(doc_nodes[-1]) is LuaFunction:
@@ -227,7 +227,7 @@ class LuaDocParser:
 
     # noinspection PyMethodMayBeStatic
     def _create_function_overload(self, original: LuaFunction, overload_def: LuaTypeCallable) -> LuaFunction:
-        overload = LuaFunction(name=original.name, short_desc=original.short_desc, desc=original.desc)
+        overload = LuaFunction(name=original.name, short_desc=original.short_desc, desc=original.desc, usage=self._usage_str)
         overload.usage = original.usage
         overload.is_virtual = original.is_virtual
         overload.is_abstract = original.is_abstract
@@ -256,11 +256,15 @@ class LuaDocParser:
                             m = re.match(regex, parts[0])
                             if m:
                                 re_handler(parts[1].strip() if len(parts) > 1 else "", ast_node, m)
+                elif parts[0] == '```lua':
+                    self._usage_in_progress = True
+                elif parts[0] == '```' and self._usage_in_progress:
+                    self._usage_in_progress = False
                 elif not self._usage_in_progress:
                     # its just a string
                     self._pending_str.append(text)
                 else:
-                    self._usage_str.append(comment[len(self._start_symbol) + 1:])
+                    self._usage_str.append(comment[len(self._start_symbol):])
         return None
 
     # noinspection PyUnusedLocal
@@ -294,6 +298,7 @@ class LuaDocParser:
 
     # noinspection PyUnusedLocal
     def _parse_module(self, params: str, ast_node: Node):
+        params = params.strip("'")
         lua_module = LuaModule(params)
         self._pending_module.append(lua_module)
         return lua_module
@@ -516,14 +521,14 @@ class LuaDocParser:
         try:
             parts = params.split(' ', 2)  # split visibility and field name
 
-            if len(parts) < 3:
-                self._report_error(ast_node, "invalid @field tag: @field %s", params)
-                return
+            # if len(parts) < 3:
+            #     self._report_error(ast_node, "invalid @field tag: @field %s", params)
+            #     return
 
             try:
                 field_visibility: LuaVisibility = self._parse_visibility(parts[0])
                 field_name: str = parts[1]
-                field_type_desc: str = parts[2]
+                field_type_desc: str = parts[2] if len(parts) > 2 else ''
             except ValueError:  # no visibility specified
                 field_visibility = LuaVisibility.PUBLIC  # default visibility
                 field_name: str = parts[0]
@@ -552,19 +557,19 @@ class LuaDocParser:
 
         if match is None:  # empty function name
             # try to deduce it from ast node
-            return LuaFunction(get_lua_function_name(ast_node), short_desc, long_desc)
+            return LuaFunction(get_lua_function_name(ast_node), short_desc, long_desc, usage=self._usage_str)
         if match.group(1):  # function name provided
             name = match.group(1)
             if ":" in name or "." in name:  # method
                 parts = re.split('[:.]', name)
                 lua_class = LuaClass(parts[0])
-                method = LuaFunction(parts[1]).init(ast_node)
+                method = LuaFunction(parts[1], usage=self._usage_str).init(ast_node)
                 method.is_static = "." in name
                 lua_class.methods.append(method)
                 self._pending_function.append(method)
                 return lua_class
             else:
-                return LuaFunction(match.group(1), short_desc, long_desc).init(ast_node)
+                return LuaFunction(match.group(1), short_desc, long_desc, usage=self._usage_str).init(ast_node)
         else:
             self._report_error(ast_node, "invalid @function tag: @function %s", params)
 
@@ -720,6 +725,9 @@ class TreeVisitor:
             Check if informations must be added directly from source code.
             Add the function in pending list or in a class.
         """
+
+        ldoc_node.name = ldoc_node.name.replace('?', '')
+
         # check if we need to deduce ldoc_node.name from ast_node
         if not ldoc_node.name:
             if type(ast_node.name) == Name and ast_node.name.id:
@@ -824,6 +832,7 @@ class TreeVisitor:
 
             for doc, ast_node in args_map:
                 if type(ast_node) != Varargs:
+                    doc.name = doc.name.replace('?', '')
                     if doc.name != ast_node.id:
                         self._report_error(func_ast_node, 'function: "%s": doc param found "%s", expected "%s"',
                                            func_doc_node.name, doc.name, ast_node.id)
