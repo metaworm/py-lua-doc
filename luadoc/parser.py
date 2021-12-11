@@ -7,7 +7,7 @@ from typing import List, Dict, cast, Callable
 import luadoc.emmylua as emmylua
 import luadoc.luadoc as luadoc
 import luadoc.astutils as astutils
-
+from . import lua_mods
 
 class DocOptions:
     def __init__(self):
@@ -621,6 +621,9 @@ def read_index(index: nodes.Index) -> (str, str):
         idx = index.idx.s
     if isinstance(index.value, Name):
         value = index.value.id
+    elif isinstance(index.value, Index):
+        a, b = read_index(index.value)
+        value = b + '.' + a
 
     return idx, value
 
@@ -675,7 +678,7 @@ class TreeVisitor:
         if self._module:
             model: LuaModule = self._module
         else:
-            model: LuaModule = LuaModule('unknown')
+            model: LuaModule = LuaModule('_G')
 
         model.file_path = self.file_path
 
@@ -760,6 +763,12 @@ class TreeVisitor:
                     self._class_map[class_name].methods.append(ldoc_node)
                 elif self._module and not self._module.is_class_mod:
                     self._module.functions.append(ldoc_node)
+                else:
+                    mod = lua_mods.get(class_name)
+                    if not mod:
+                        mod = lua_mods['_G']
+                        ldoc_node.name = class_name + '.' + func_name
+                    mod.functions.append(ldoc_node)
 
         else:
             self._function_list.append(ldoc_node)

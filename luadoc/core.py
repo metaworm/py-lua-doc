@@ -5,7 +5,7 @@ import json
 import concurrent.futures
 import logging
 from luadoc.parser import DocParser, DocOptions
-
+from . import lua_mods
 
 class Configuration:
     @staticmethod
@@ -51,7 +51,10 @@ class FilesProcessor:
         # some stats
         start = time.time()
         total_file = 0
-        model = []
+
+        from luadoc.model import LuaModule
+        model = [LuaModule('_G')]
+        lua_mods['_G'] = model[0]
 
         # We can use a with statement to ensure threads are cleaned up promptly
         with concurrent.futures.ThreadPoolExecutor(max_workers=self._jobs) as executor:
@@ -61,7 +64,15 @@ class FilesProcessor:
                 file = future_to_file[future]
                 try:
                     total_file += 1
-                    model.append(future.result())
+                    m = future.result()
+                    if m.name in lua_mods:
+                        l = lua_mods[m.name]
+                        l.classes += m.classes
+                        l.functions += m.functions
+                        l.data += m.data
+                    else:
+                        lua_mods[m.name] = m
+                        model.append(m)
                 except Exception as exc:
                     logging.error('%r generated an exception: %s' % (file, exc))
                 else:
